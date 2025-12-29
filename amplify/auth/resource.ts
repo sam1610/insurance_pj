@@ -1,18 +1,29 @@
-import { defineAuth } from '@aws-amplify/backend';
+import { defineAuth, defineFunction } from '@aws-amplify/backend'; // <--- ADD THIS IMPORT
 
-/**
- * Define and configure your auth resource
- * @see https://docs.amplify.aws/gen2/build-a-backend/auth
- */
+export const postConfirmation = defineFunction({
+  name: 'post-confirmation',
+  entry: './post-confirmation/handler.ts',
+});
+
 export const auth = defineAuth({
   loginWith: {
     email: true,
-    phone:true
   },
   userAttributes: {
-    phoneNumber: {
-      required: true,
-      mutable:false 
+    givenName: {
+      mutable: true,
+      required: false,
+    },
+    familyName: {
+      mutable: true,
+      required: false,
     },
   },
+  groups: ['Admin', 'Customers'],
+  triggers: {
+    postConfirmation,
+  },
+  access: (allow) => [
+    allow.resource(postConfirmation).to(['addUserToGroup']),
+  ],
 });

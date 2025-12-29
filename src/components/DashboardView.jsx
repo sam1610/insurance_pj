@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { generateClient } from 'aws-amplify/data';
+import { client } from "../DataHook/AmplifyClient" ;
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 
-const client = generateClient();
 
 const KPI_CARD = ({ title, value, subtext, color = "text-white" }) => (
     <div className="bg-slate-800 p-5 rounded-xl border border-slate-700 shadow-sm hover:border-slate-600 transition-all">
@@ -75,7 +74,7 @@ export default function DashboardView() {
         <div className="p-4 space-y-6">
             <header className="flex justify-between items-end">
                 <div>
-                    <h1 className="text-2xl font-bold text-white">Overview</h1>
+                    <h1 className="text-2xl font-bold text-white">AssurEnligne</h1>
                     <p className="text-slate-400 text-sm">Welcome back, Admin</p>
                 </div>
                 <span className="text-xs bg-sky-900/50 text-sky-400 px-3 py-1 rounded-full border border-sky-800">

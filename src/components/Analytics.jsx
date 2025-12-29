@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { generateClient } from 'aws-amplify/data';
+import { client } from "../DataHook/AmplifyClient" ;
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from 'recharts';
 
-const client = generateClient();
 
 export default function Analytics() {
     const [data, setData] = useState([]);

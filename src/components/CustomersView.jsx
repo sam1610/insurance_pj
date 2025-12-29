@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { generateClient } from 'aws-amplify/data';
+import { client } from "../DataHook/AmplifyClient" ;
 import { useVirtualizer } from '@tanstack/react-virtual';
 
-const client = generateClient();
 
 export default function CustomersView() {
     const [customers, setCustomers] = useState([]);

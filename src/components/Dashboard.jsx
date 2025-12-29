@@ -12,14 +12,14 @@ const BarChartIcon = ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" 
 
 const classNames = (...classes) => classes.filter(Boolean).join(' ');
 
-export default function Dashboard() {
+export default function Dashboard( username , isCustomerView=false) {
     const [activeView, setActiveView] = useState('dashboard');
 
     const renderView = () => {
         switch (activeView) {
             case 'dashboard': return <DashboardView />;
             case 'customers': return <CustomersView />;
-            case 'policies': return <PoliciesView />;
+            case 'policies': return <PoliciesView username={user.username} isCustomerView={false}/>;
             case 'analytics': return <Analytics />;
             default: return <DashboardView />;
         }
