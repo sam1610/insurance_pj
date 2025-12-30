@@ -1,27 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import { client } from "../DataHook/AmplifyClient" ;
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from 'recharts';
-
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
 
 export default function Analytics() {
     const [data, setData] = useState([]);
 
     useEffect(() => {
         const loadData = async () => {
-            // Aggregate policies to show starts per month
             const { data: policies } = await client.models.InsuranceData.policyList({ type: 'POLICY' });
             
-            // Simple transformation: Count policies by Start Month
             const timeline = {};
             policies.forEach(p => {
                 if(!p.startDate) return;
-                const month = p.startDate.slice(0, 7); // YYYY-MM
+                const month = p.startDate.slice(0, 7);
                 if(!timeline[month]) timeline[month] = { month, policies: 0, premiums: 0 };
                 timeline[month].policies += 1;
                 timeline[month].premiums += (p.premiumAmount || 0);
             });
 
-            // Convert to array and sort
             const chartData = Object.values(timeline).sort((a,b) => a.month.localeCompare(b.month));
             setData(chartData);
         };
@@ -30,12 +26,11 @@ export default function Analytics() {
 
     return (
         <div className="p-4 space-y-6">
-            <h1 className="text-2xl font-bold text-indigo-400">Business Intelligence</h1>
+            <h1 className="text-2xl font-bold text-indigo-400">Auto Insurance Metrics</h1>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Chart 1: Revenue Trend */}
                 <div className="bg-slate-800 p-5 rounded-xl border border-slate-700 shadow-lg">
-                    <h3 className="text-white font-semibold mb-4">Premium Revenue Trend</h3>
+                    <h3 className="text-white font-semibold mb-4">Total Premium Revenue</h3>
                     <div className="h-80 w-full">
                         <ResponsiveContainer width="100%" height="100%">
                             <LineChart data={data}>
@@ -49,9 +44,8 @@ export default function Analytics() {
                     </div>
                 </div>
 
-                {/* Chart 2: Policy Volume */}
                 <div className="bg-slate-800 p-5 rounded-xl border border-slate-700 shadow-lg">
-                    <h3 className="text-white font-semibold mb-4">New Policies per Month</h3>
+                    <h3 className="text-white font-semibold mb-4">New Vehicles Insured</h3>
                     <div className="h-80 w-full">
                         <ResponsiveContainer width="100%" height="100%">
                             <BarChart data={data}>
