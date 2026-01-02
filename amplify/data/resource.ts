@@ -1,5 +1,6 @@
 import { type ClientSchema, a, defineData } from '@aws-amplify/backend';
-
+import { predictPremium } from '../functions/predict-premium/resource';
+import { GenericLogDriver } from 'aws-cdk-lib/aws-ecs';
 const schema = a.schema({
   InsuranceData: a.model({
     // 1. COMPOSITE PRIMARY KEY
@@ -23,6 +24,7 @@ const schema = a.schema({
     annualMileage: a.integer(),  // Annual mileage driven
     // Policy Attributes
     policyNumber: a.string(),
+    coverageAmount: a.float(),
 
     premiumAmount: a.float(),
     
@@ -49,7 +51,29 @@ const schema = a.schema({
       index('type').sortKeys(['sk']).name('policy').queryField("policyList"),
       index('type').sortKeys(['status']).name('status').queryField("ativePolicy"),
     ]),
+    // 1. Define the Response Type
+  PremiumQuote: a.customType({
+    premium: a.float(),
+  }),
+  getPremiumQuote: a.query()
+    .arguments({
+      age: a.integer(),
+      gender: a.string(),
+      carAge: a.integer(),
+      driverExp: a.integer(),
+      prevAccidents: a.integer(),
+      vehicleDamage: a.string(),
+      regionCode: a.string(),
+      annualMileage: a.integer(),
+      coverageAmount: a.float(), 
+      startDate: a.string(),    
+      endDate: a.string()
+    })
+    .returns(a.ref('PremiumQuote'))
+    .handler(a.handler.function(predictPremium)) // <--- Link Handler
+    .authorization(allow => [allow.authenticated()]),
 });
+
 
 export type Schema = ClientSchema<typeof schema>;
 
