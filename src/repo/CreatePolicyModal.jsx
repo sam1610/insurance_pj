@@ -13,11 +13,9 @@ export default function CreatePolicyModal({ onClose, onSubmit, isSubmitting }) {
         regionCode: '',      
         vehicleDamage: 'No', 
         coverageAmount: 15000,
-        vintage: 150, // <--- NEW: Default Customer Tenure (Days)
         startDate: new Date().toISOString().split('T')[0],
         endDate: '',
-        premiumAmount: 0,
-        acceptanceProbability: 0 // <--- NEW: Store ML Probability
+        premiumAmount: 0 
     });
 
     const [isSimulating, setIsSimulating] = useState(false);
@@ -31,7 +29,6 @@ export default function CreatePolicyModal({ onClose, onSubmit, isSubmitting }) {
         formData.driverExp !== '' &&
         formData.annualMileage !== '' &&
         formData.regionCode !== '' &&
-        formData.vintage !== '' && // <--- Validate Vintage
         formData.startDate && 
         formData.endDate;
 
@@ -42,11 +39,7 @@ export default function CreatePolicyModal({ onClose, onSubmit, isSubmitting }) {
         // Reset simulation if user edits the form
         if (simulated) {
             setSimulated(false);
-            setFormData(prev => ({ 
-                ...prev, 
-                premiumAmount: 0,
-                acceptanceProbability: 0 
-            }));
+            setFormData(prev => ({ ...prev, premiumAmount: 0 }));
         }
     };
 
@@ -57,7 +50,6 @@ export default function CreatePolicyModal({ onClose, onSubmit, isSubmitting }) {
             const carAge = currentYear - parseInt(formData.carManifYear);
 
             // 3. Call Backend
-            
             const { data, errors } = await client.queries.getPremiumQuote({
                 age: parseInt(formData.age),
                 gender: formData.gender,            
@@ -68,18 +60,12 @@ export default function CreatePolicyModal({ onClose, onSubmit, isSubmitting }) {
                 regionCode: formData.regionCode,
                 annualMileage: parseInt(formData.annualMileage),
                 coverageAmount: parseFloat(formData.coverageAmount),
-                vintage: parseInt(formData.vintage), // <--- Passing Vintage
                 startDate: formData.startDate,
                 endDate: formData.endDate
             });
 
             if (data && data.premium) {
-                setFormData(prev => ({ 
-                    ...prev, 
-                    premiumAmount: data.premium,
-                    // Store the probability returned by Python ML (defaults to 0 if missing)
-                    acceptanceProbability: data.acceptanceProbability || 0 
-                }));
+                setFormData(prev => ({ ...prev, premiumAmount: data.premium }));
                 setSimulated(true);
             } else {
                 console.error("AI Error:", errors);
@@ -101,6 +87,7 @@ export default function CreatePolicyModal({ onClose, onSubmit, isSubmitting }) {
         onSubmit({
             ...formData,
             carAge,
+            // Ensure premiumAmount is passed. If 0 (fallback), calculate logic or use simulated
             premiumAmount: formData.premiumAmount > 0 ? formData.premiumAmount : 0
         });
     };
@@ -205,10 +192,10 @@ export default function CreatePolicyModal({ onClose, onSubmit, isSubmitting }) {
                         </div>
                     </div>
 
-                    {/* --- ROW 5: Damage & Vintage (NEW) --- */}
+                    {/* --- ROW 5: Damage & Dates --- */}
                     <div className="grid grid-cols-2 gap-4">
-                        <div>
-                             <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Prior Damage?</label>
+                        <div className="col-span-2">
+                             <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Prior Vehicle Damage?</label>
                              <select 
                                  name="vehicleDamage"
                                  value={formData.vehicleDamage} onChange={handleChange}
@@ -217,15 +204,6 @@ export default function CreatePolicyModal({ onClose, onSubmit, isSubmitting }) {
                                  <option value="No">No</option>
                                  <option value="Yes">Yes</option>
                              </select>
-                        </div>
-                        {/* --- NEW VINTAGE INPUT --- */}
-                        <div>
-                             <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Tenure (Days)</label>
-                             <input 
-                                required type="number" name="vintage" placeholder="e.g. 100"
-                                value={formData.vintage} onChange={handleChange}
-                                className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-white focus:border-indigo-500 outline-none"
-                             />
                         </div>
                     </div>
 
@@ -248,43 +226,16 @@ export default function CreatePolicyModal({ onClose, onSubmit, isSubmitting }) {
                         </div>
                     </div>
                     
-                    {/* --- PREMIUM DISPLAY & ML INSIGHTS --- */}
+                    {/* --- PREMIUM DISPLAY --- */}
                     {simulated && (
-                        <div className="space-y-3 animate-fade-in mt-2">
-                            {/* Premium Price */}
-                            <div className="bg-emerald-900/20 border border-emerald-900/50 p-4 rounded-xl flex justify-between items-center">
-                                <div>
-                                    <p className="text-emerald-500 text-xs font-bold uppercase tracking-wide">AI Calculated Premium</p>
-                                    <p className="text-slate-400 text-xs">For {formData.gender} driver, {formData.age} years old</p>
-                                </div>
-                                <span className="text-2xl font-bold text-emerald-400">
-                                    ${formData.premiumAmount.toLocaleString()}
-                                </span>
+                        <div className="bg-emerald-900/20 border border-emerald-900/50 p-4 rounded-xl flex justify-between items-center animate-fade-in mt-2">
+                            <div>
+                                <p className="text-emerald-500 text-xs font-bold uppercase tracking-wide">AI Calculated Premium</p>
+                                <p className="text-slate-400 text-xs">For {formData.gender} driver, {formData.age} years old</p>
                             </div>
-
-                            {/* --- NEW: ML Probability Display --- */}
-                            {formData.acceptanceProbability > 0 && (
-                                <div className="bg-slate-800/50 border border-slate-700/50 p-4 rounded-xl">
-                                    <div className="flex justify-between items-center mb-2">
-                                        <p className="text-indigo-400 text-xs font-bold uppercase tracking-wide">Customer Acceptance Chance</p>
-                                        <span className="text-white font-mono font-bold">
-                                            {(formData.acceptanceProbability * 100).toFixed(1)}%
-                                        </span>
-                                    </div>
-                                    <div className="w-full bg-slate-700 h-2 rounded-full overflow-hidden">
-                                        <div 
-                                            className={`h-full rounded-full transition-all duration-1000 ${
-                                                formData.acceptanceProbability > 0.6 ? 'bg-emerald-500' : 
-                                                formData.acceptanceProbability > 0.3 ? 'bg-yellow-500' : 'bg-red-500'
-                                            }`}
-                                            style={{ width: `${formData.acceptanceProbability * 100}%` }}
-                                        ></div>
-                                    </div>
-                                    <p className="text-slate-500 text-[10px] mt-2 text-right">
-                                        Based on ML analysis of similar customer profiles
-                                    </p>
-                                </div>
-                            )}
+                            <span className="text-2xl font-bold text-emerald-400">
+                                ${formData.premiumAmount.toLocaleString()}
+                            </span>
                         </div>
                     )}
 

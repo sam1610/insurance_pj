@@ -52,8 +52,10 @@ const schema = a.schema({
       index('type').sortKeys(['status']).name('status').queryField("ativePolicy"),
     ]),
     // 1. Define the Response Type
+    
   PremiumQuote: a.customType({
     premium: a.float(),
+    acceptanceProbability: a.float(),
   }),
   getPremiumQuote: a.query()
     .arguments({
@@ -61,16 +63,19 @@ const schema = a.schema({
       gender: a.string(),
       carAge: a.integer(),
       driverExp: a.integer(),
+      vintage: a.integer(),
       prevAccidents: a.integer(),
       vehicleDamage: a.string(),
       regionCode: a.string(),
       annualMileage: a.integer(),
       coverageAmount: a.float(), 
+      
       startDate: a.string(),    
       endDate: a.string()
+
     })
     .returns(a.ref('PremiumQuote'))
-    .handler(a.handler.function(predictPremium)) // <--- Link Handler
+    .handler(a.handler.function(predictPremium)) 
     .authorization(allow => [allow.authenticated()]),
 });
 
