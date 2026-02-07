@@ -13,11 +13,10 @@ export default function CreatePolicyModal({ onClose, onSubmit, isSubmitting }) {
         regionCode: '',      
         vehicleDamage: 'No', 
         coverageAmount: 15000,
-        vintage: 150, // <--- NEW: Default Customer Tenure (Days)
+        vintage: 150, 
         startDate: new Date().toISOString().split('T')[0],
         endDate: '',
-        premiumAmount: 0,
-        acceptanceProbability: 0 // <--- NEW: Store ML Probability
+        premiumAmount: 0
     });
 
     const [isSimulating, setIsSimulating] = useState(false);
@@ -31,7 +30,7 @@ export default function CreatePolicyModal({ onClose, onSubmit, isSubmitting }) {
         formData.driverExp !== '' &&
         formData.annualMileage !== '' &&
         formData.regionCode !== '' &&
-        formData.vintage !== '' && // <--- Validate Vintage
+        formData.vintage !== '' && 
         formData.startDate && 
         formData.endDate;
 
@@ -42,11 +41,7 @@ export default function CreatePolicyModal({ onClose, onSubmit, isSubmitting }) {
         // Reset simulation if user edits the form
         if (simulated) {
             setSimulated(false);
-            setFormData(prev => ({ 
-                ...prev, 
-                premiumAmount: 0,
-                acceptanceProbability: 0 
-            }));
+            setFormData(prev => ({ ...prev, premiumAmount: 0 }));
         }
     };
 
@@ -56,8 +51,6 @@ export default function CreatePolicyModal({ onClose, onSubmit, isSubmitting }) {
             const currentYear = new Date().getFullYear();
             const carAge = currentYear - parseInt(formData.carManifYear);
 
-            // 3. Call Backend
-            
             const { data, errors } = await client.queries.getPremiumQuote({
                 age: parseInt(formData.age),
                 gender: formData.gender,            
@@ -68,7 +61,7 @@ export default function CreatePolicyModal({ onClose, onSubmit, isSubmitting }) {
                 regionCode: formData.regionCode,
                 annualMileage: parseInt(formData.annualMileage),
                 coverageAmount: parseFloat(formData.coverageAmount),
-                vintage: parseInt(formData.vintage), // <--- Passing Vintage
+                vintage: parseInt(formData.vintage), 
                 startDate: formData.startDate,
                 endDate: formData.endDate
             });
@@ -76,9 +69,7 @@ export default function CreatePolicyModal({ onClose, onSubmit, isSubmitting }) {
             if (data && data.premium) {
                 setFormData(prev => ({ 
                     ...prev, 
-                    premiumAmount: data.premium,
-                    // Store the probability returned by Python ML (defaults to 0 if missing)
-                    acceptanceProbability: data.acceptanceProbability || 0 
+                    premiumAmount: data.premium
                 }));
                 setSimulated(true);
             } else {
@@ -107,7 +98,7 @@ export default function CreatePolicyModal({ onClose, onSubmit, isSubmitting }) {
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-            <div className="bg-slate-900 w-full max-w-lg rounded-2xl border border-slate-700 shadow-2xl flex flex-col max-h-[90vh]">
+            <div className="bg-slate-900 w-full max-w-xl rounded-2xl border border-slate-700 shadow-2xl flex flex-col max-h-[90vh]">
                 
                 <div className="p-6 border-b border-slate-800">
                     <h2 className="text-xl font-bold text-white">New Policy Quote</h2>
@@ -116,87 +107,49 @@ export default function CreatePolicyModal({ onClose, onSubmit, isSubmitting }) {
 
                 <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto">
                     
-                    {/* --- ROW 1: Car & Coverage --- */}
+                    {/* --- INPUT SECTIONS --- */}
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Car Year</label>
-                            <input 
-                                required type="number" name="carManifYear"
-                                value={formData.carManifYear} onChange={handleChange}
-                                className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-white focus:border-indigo-500 outline-none"
-                            />
+                            <input required type="number" name="carManifYear" value={formData.carManifYear} onChange={handleChange} className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-white focus:border-indigo-500 outline-none" />
                         </div>
                         <div>
                             <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Coverage ($)</label>
-                            <input 
-                                required type="number" name="coverageAmount" step="1000"
-                                value={formData.coverageAmount} onChange={handleChange}
-                                className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-white focus:border-indigo-500 outline-none"
-                            />
+                            <input required type="number" name="coverageAmount" step="1000" value={formData.coverageAmount} onChange={handleChange} className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-white focus:border-indigo-500 outline-none" />
                         </div>
                     </div>
-
-                    {/* --- ROW 2: Driver Age & Gender --- */}
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Driver Age</label>
-                            <input 
-                                required type="number" name="age" placeholder="e.g. 35" min="18" max="99"
-                                value={formData.age} onChange={handleChange}
-                                className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-white focus:border-indigo-500 outline-none"
-                            />
+                            <input required type="number" name="age" placeholder="e.g. 35" min="18" max="99" value={formData.age} onChange={handleChange} className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-white focus:border-indigo-500 outline-none" />
                         </div>
                         <div>
                             <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Gender</label>
-                            <select 
-                                name="gender" required
-                                value={formData.gender} onChange={handleChange}
-                                className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-white focus:border-indigo-500 outline-none"
-                            >
+                            <select name="gender" required value={formData.gender} onChange={handleChange} className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-white focus:border-indigo-500 outline-none">
                                 <option value="">Select...</option>
                                 <option value="Male">Male</option>
                                 <option value="Female">Female</option>
                             </select>
                         </div>
                     </div>
-
-                    {/* --- ROW 3: Experience & Mileage --- */}
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Driver Exp (Yrs)</label>
-                            <input 
-                                required type="number" name="driverExp" placeholder="e.g. 5"
-                                value={formData.driverExp} onChange={handleChange}
-                                className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-white focus:border-indigo-500 outline-none"
-                            />
+                            <input required type="number" name="driverExp" placeholder="e.g. 5" value={formData.driverExp} onChange={handleChange} className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-white focus:border-indigo-500 outline-none" />
                         </div>
                         <div>
                             <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Annual Mileage</label>
-                            <input 
-                                required type="number" name="annualMileage" placeholder="e.g. 15000"
-                                value={formData.annualMileage} onChange={handleChange}
-                                className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-white focus:border-indigo-500 outline-none"
-                            />
+                            <input required type="number" name="annualMileage" placeholder="e.g. 15000" value={formData.annualMileage} onChange={handleChange} className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-white focus:border-indigo-500 outline-none" />
                         </div>
                     </div>
-
-                    {/* --- ROW 4: Accidents & Region --- */}
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Accidents (Past 3y)</label>
-                            <input 
-                                required type="number" name="prevAccidents"
-                                value={formData.prevAccidents} onChange={handleChange}
-                                className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-white focus:border-indigo-500 outline-none"
-                            />
+                            <input required type="number" name="prevAccidents" value={formData.prevAccidents} onChange={handleChange} className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-white focus:border-indigo-500 outline-none" />
                         </div>
                         <div>
                             <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Region Code</label>
-                            <select 
-                                name="regionCode" required
-                                value={formData.regionCode} onChange={handleChange}
-                                className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-white focus:border-indigo-500 outline-none"
-                            >
+                            <select name="regionCode" required value={formData.regionCode} onChange={handleChange} className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-white focus:border-indigo-500 outline-none">
                                 <option value="">Select...</option>
                                 <option value="26">Urban (26)</option>
                                 <option value="50">Suburban (50)</option>
@@ -204,87 +157,42 @@ export default function CreatePolicyModal({ onClose, onSubmit, isSubmitting }) {
                             </select>
                         </div>
                     </div>
-
-                    {/* --- ROW 5: Damage & Vintage (NEW) --- */}
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Prior Damage?</label>
-                             <select 
-                                 name="vehicleDamage"
-                                 value={formData.vehicleDamage} onChange={handleChange}
-                                 className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-white focus:border-indigo-500 outline-none"
-                             >
+                             <select name="vehicleDamage" value={formData.vehicleDamage} onChange={handleChange} className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-white focus:border-indigo-500 outline-none">
                                  <option value="No">No</option>
                                  <option value="Yes">Yes</option>
                              </select>
                         </div>
-                        {/* --- NEW VINTAGE INPUT --- */}
                         <div>
                              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Tenure (Days)</label>
-                             <input 
-                                required type="number" name="vintage" placeholder="e.g. 100"
-                                value={formData.vintage} onChange={handleChange}
-                                className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-white focus:border-indigo-500 outline-none"
-                             />
+                             <input required type="number" name="vintage" placeholder="e.g. 100" value={formData.vintage} onChange={handleChange} className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-white focus:border-indigo-500 outline-none" />
                         </div>
                     </div>
-
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Start Date</label>
-                            <input 
-                                required type="date" name="startDate"
-                                value={formData.startDate} onChange={handleChange}
-                                className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-white focus:border-indigo-500 outline-none"
-                            />
+                            <input required type="date" name="startDate" value={formData.startDate} onChange={handleChange} className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-white focus:border-indigo-500 outline-none" />
                         </div>
                         <div>
                             <label className="block text-xs font-bold text-slate-500 uppercase mb-1">End Date</label>
-                            <input 
-                                required type="date" name="endDate"
-                                value={formData.endDate} onChange={handleChange}
-                                className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-white focus:border-indigo-500 outline-none"
-                            />
+                            <input required type="date" name="endDate" value={formData.endDate} onChange={handleChange} className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-white focus:border-indigo-500 outline-none" />
                         </div>
                     </div>
                     
-                    {/* --- PREMIUM DISPLAY & ML INSIGHTS --- */}
+                    {/* --- 🔥 CLEANED RESULT SECTION (No ML) --- */}
                     {simulated && (
-                        <div className="space-y-3 animate-fade-in mt-2">
-                            {/* Premium Price */}
-                            <div className="bg-emerald-900/20 border border-emerald-900/50 p-4 rounded-xl flex justify-between items-center">
-                                <div>
-                                    <p className="text-emerald-500 text-xs font-bold uppercase tracking-wide">AI Calculated Premium</p>
-                                    <p className="text-slate-400 text-xs">For {formData.gender} driver, {formData.age} years old</p>
-                                </div>
-                                <span className="text-2xl font-bold text-emerald-400">
+                        <div className="mt-4 animate-fade-in">
+                            <div className="bg-slate-800 border border-emerald-500/30 p-6 rounded-xl flex flex-col items-center justify-center text-center shadow-lg shadow-emerald-900/10">
+                                <p className="text-emerald-500 text-xs font-black uppercase tracking-widest mb-2">AI Calculated Premium</p>
+                                <span className="text-4xl font-black text-white">
                                     ${formData.premiumAmount.toLocaleString()}
                                 </span>
+                                <p className="text-slate-500 text-xs mt-2">
+                                    Generated by AWS Bedrock using Bias Rules
+                                </p>
                             </div>
-
-                            {/* --- NEW: ML Probability Display --- */}
-                            {formData.acceptanceProbability > 0 && (
-                                <div className="bg-slate-800/50 border border-slate-700/50 p-4 rounded-xl">
-                                    <div className="flex justify-between items-center mb-2">
-                                        <p className="text-indigo-400 text-xs font-bold uppercase tracking-wide">Customer Acceptance Chance</p>
-                                        <span className="text-white font-mono font-bold">
-                                            {(formData.acceptanceProbability * 100).toFixed(1)}%
-                                        </span>
-                                    </div>
-                                    <div className="w-full bg-slate-700 h-2 rounded-full overflow-hidden">
-                                        <div 
-                                            className={`h-full rounded-full transition-all duration-1000 ${
-                                                formData.acceptanceProbability > 0.6 ? 'bg-emerald-500' : 
-                                                formData.acceptanceProbability > 0.3 ? 'bg-yellow-500' : 'bg-red-500'
-                                            }`}
-                                            style={{ width: `${formData.acceptanceProbability * 100}%` }}
-                                        ></div>
-                                    </div>
-                                    <p className="text-slate-500 text-[10px] mt-2 text-right">
-                                        Based on ML analysis of similar customer profiles
-                                    </p>
-                                </div>
-                            )}
                         </div>
                     )}
 
@@ -304,23 +212,16 @@ export default function CreatePolicyModal({ onClose, onSubmit, isSubmitting }) {
                                 {isSimulating ? (
                                     <>
                                         <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                                        Connecting to Agent...
+                                        Calculating...
                                     </>
                                 ) : (
-                                    <>
-                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" /></svg>
-                                        Simulate Quote
-                                    </>
+                                    "Simulate Quote"
                                 )}
                             </button>
                         )}
 
                         <div className="flex gap-3">
-                            <button 
-                                type="button" 
-                                onClick={onClose}
-                                className="flex-1 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-lg transition-colors"
-                            >
+                            <button type="button" onClick={onClose} className="flex-1 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-lg transition-colors">
                                 Cancel
                             </button>
                             <button 

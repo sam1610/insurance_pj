@@ -1,7 +1,7 @@
 import { AppSyncResolverHandler } from 'aws-lambda';
 import { BedrockRuntimeClient, InvokeModelCommand } from "@aws-sdk/client-bedrock-runtime";
-import { LambdaClient, InvokeCommand } from "@aws-sdk/client-lambda"; 
 
+// --- TYPES ---
 type PredictPremiumArgs = {
   age: number;
   gender: string; 
@@ -19,128 +19,93 @@ type PredictPremiumArgs = {
 
 type PremiumQuote = {
   premium: number;
-  acceptanceProbability: number;
+  acceptanceProbability: number | null; 
 };
 
 const bedrockClient = new BedrockRuntimeClient({ region: process.env.AWS_REGION });
-const lambdaClient = new LambdaClient({ region: process.env.AWS_REGION }); 
 
 export const handler: AppSyncResolverHandler<PredictPremiumArgs, PremiumQuote> = async (event) => {
+  console.log("🚀 STARTING SIMULATION 🚀");
+  console.log("INPUTS:", JSON.stringify(event.arguments));
+
   const { 
-    age, gender, carAge, driverExp, prevAccidents, 
-    vehicleDamage, regionCode, annualMileage, coverageAmount,
-    vintage, 
-    startDate, endDate
+    age, gender, regionCode, prevAccidents, vehicleDamage, 
+    coverageAmount, startDate, endDate 
   } = event.arguments;
 
-  // --- STEP 1: PRE-CALCULATE MATH ---
+  // --- PART 1: MATH ---
   const start = new Date(startDate);
   const end = new Date(endDate);
-  const durationMs = end.getTime() - start.getTime();
-  const durationDays = Math.max(1, Math.ceil(durationMs / (1000 * 60 * 60 * 24)));
+  const durationDays = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
   const durationMultiplier = durationDays / 365;
   const baseAnnualPremium = coverageAmount * 0.02;
 
-
- const prompt = `
+  // --- PART 2: PROMPT ---
+  const prompt = `
     You are a strict Algorithmic Insurance Underwriter. 
-    Calculate the 'annual_premium' by applying the following BIASED RISK RULES to the Base Premium.
+    Calculate the 'annual_premium' by applying the following HEAVILY BIASED RISK RULES.
 
     INPUT PROFILE:
     - Base Premium: $${baseAnnualPremium}
     - Driver: ${age} years old, ${gender}
-    - Region: ${regionCode}
-    - Accidents: ${prevAccidents}
-    - Damage History: ${vehicleDamage}
+    - Region Code: ${regionCode} (26=Urban, 50=Suburban, 10=Rural)
 
-    MANDATORY BIAS RULES (Apply sequentially):
-    
-    1. GENDER & AGE BIAS (Statistical Profiling):
-       - IF Gender is 'Male' AND Age < 25: INCREASE Base Premium by 40% (High Risk Group).
-       - IF Gender is 'Male' AND Age >= 25: INCREASE Base Premium by 5%.
-       - IF Gender is 'Female': DECREASE Base Premium by 10% (Safe Driver Bias).
-       - IF Age > 60: INCREASE Base Premium by 15% (Senior Risk).
+    RULES:
+    1. Male < 25: +50%. Female: -15%. 
+    2. Urban (26): +30%. Rural (10): -20%.
+    3. Accidents: +$400 each.
 
-    2. REGION BIAS (Location Risk):
-       - IF RegionCode is '28' (Urban): INCREASE result by 20%.
-       - IF RegionCode is '50' (City): INCREASE result by 15%.
-       - IF RegionCode is '8' or '10' (Rural): DECREASE result by 10%.
-       
-    3. HISTORY PENALTIES:
-       - Add +$350 for EACH previous accident.
-       - Add +$200 if Vehicle Damage is 'Yes'.
+    OUTPUT FORMAT: {"annual_premium": 1234.56}
+  `;
 
-    OUTPUT INSTRUCTIONS:
-    - Return ONLY raw JSON. No markdown, no explanation.
-    - Format: {"annual_premium": 1234.56}
-  `
+  let annualPremium = 0;
 
   try {
+    // 1. Log before calling
+    console.log("... Invoking Bedrock Titan Express ...");
+    
     const command = new InvokeModelCommand({
       modelId: "amazon.titan-text-express-v1",
       contentType: "application/json",
       accept: "application/json",
-      body: JSON.stringify({
-        inputText: prompt,
-        textGenerationConfig: { maxTokenCount: 512, temperature: 0, topP: 1 }
+      body: JSON.stringify({ 
+          inputText: prompt, 
+          textGenerationConfig: { maxTokenCount: 128, temperature: 0 } 
       }),
     });
 
     const response = await bedrockClient.send(command);
-    const responseBody = JSON.parse(new TextDecoder().decode(response.body));
-    const rawAiText = responseBody.results[0].outputText;
-
-    // --- STEP 3: PARSE AI RESULT ---
-    const jsonMatch = rawAiText.match(/\{.*"annual_premium":\s*(\d+(\.\d+)?).*\}/s);
-    let annualPremium = 0;
     
+    // 2. Log Raw Response
+    const responseBody = new TextDecoder().decode(response.body);
+    console.log("RAW AI RESPONSE:", responseBody);
+
+    const parsedBody = JSON.parse(responseBody);
+    const rawAiText = parsedBody.results[0].outputText;
+    console.log("AI TEXT OUTPUT:", rawAiText);
+
+    // 3. Parse JSON
+    const jsonMatch = rawAiText.match(/\{.*"annual_premium":\s*(\d+(\.\d+)?).*\}/s);
     if (jsonMatch) {
-        try { annualPremium = JSON.parse(jsonMatch[0]).annual_premium; } 
-        catch(e) { annualPremium = parseFloat(jsonMatch[1]); }
-    }
-    if (!annualPremium) annualPremium = baseAnnualPremium + 500; 
-
-    const finalPremium = annualPremium * durationMultiplier;
-
-    // --- STEP 5: CALL ML MODEL FOR PROBABILITY ---
-    let prob = 0;
-    try {
-        // FIX: Use the Environment Variable we set in backend.ts
-        const functionName = process.env.ML_FUNCTION_NAME; 
-
-        if (!functionName) throw new Error("ML_FUNCTION_NAME env var missing");
-
-        const command = new InvokeCommand({
-            FunctionName: functionName, // <--- Using Dynamic Name
-            Payload: JSON.stringify({
-                features: {
-                    ...event.arguments,
-                    annualPremium: finalPremium,
-                    vintage: vintage 
-                }
-            })
-        });
-        
-        const response = await lambdaClient.send(command);
-        
-        if (response.Payload) {
-            const payload = JSON.parse(new TextDecoder().decode(response.Payload));
-            if (payload.body) {
-                const body = JSON.parse(payload.body);
-                prob = body.probability;
-            }
-        }
-    } catch (e) {
-        console.warn("ML Model offline, defaulting to 0", e);
+        annualPremium = JSON.parse(jsonMatch[0]).annual_premium;
+        console.log("✅ PARSED PREMIUM:", annualPremium);
+    } else {
+        console.error("❌ REGEX FAILED. Could not find JSON in text.");
+        throw new Error("AI output format invalid");
     }
 
-    return { 
-      premium: parseFloat(finalPremium.toFixed(2)), 
-      acceptanceProbability: prob 
-    };
-
-  } catch (error) {
-    console.error("Bedrock Execution Error:", error);
-    throw new Error("Failed to generate premium quote.");
+  } catch (e) {
+    console.error("🔥 CRITICAL BEDROCK ERROR 🔥");
+    console.error(e);
+    // TEMPORARY: Throw error so frontend sees it, instead of silent fallback
+    // This allows you to read the error message in the React 'alert'
+    throw new Error(`Bedrock Failed: ${e.message}`);
   }
+
+  const finalPremium = annualPremium * durationMultiplier;
+
+  return { 
+    premium: parseFloat(finalPremium.toFixed(2)), 
+    acceptanceProbability: null 
+  };
 };

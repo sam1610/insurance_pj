@@ -1,141 +1,256 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { client } from "../DataHook/AmplifyClient" ;
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
+import { client } from "../DataHook/AmplifyClient"; // Ensure path is correct
+import { 
+    PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid 
+} from 'recharts';
 
-
-const KPI_CARD = ({ title, value, subtext, color = "text-white" }) => (
-    <div className="bg-slate-800 p-5 rounded-xl border border-slate-700 shadow-sm hover:border-slate-600 transition-all">
-        <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">{title}</p>
-        <p className={`text-3xl font-bold ${color}`}>{value}</p>
-        {subtext && <p className="text-slate-500 text-xs mt-2">{subtext}</p>}
+// --- KPI CARD COMPONENT ---
+const KPICard = ({ title, value, subtext, color = "text-white", borderColor = "border-slate-700" }) => (
+    <div className={`bg-slate-800 p-5 rounded-xl border ${borderColor} shadow-lg hover:border-slate-500 transition-all duration-300`}>
+        <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-2">{title}</p>
+        <p className={`text-3xl font-black ${color}`}>{value}</p>
+        {subtext && <p className="text-slate-500 text-[10px] font-medium mt-2">{subtext}</p>}
     </div>
 );
 
 export default function DashboardView() {
-    const [stats, setStats] = useState({ policies: [], claims: [], loading: true });
+    const [stats, setStats] = useState({ 
+        policies: [], 
+        claims: [], 
+        loading: true, 
+        error: null 
+    });
 
+    // --- 1. DATA FETCHING ---
     useEffect(() => {
         const fetchDashboardData = async () => {
             try {
-                // 1. Get all Policies using the 'policyList' index
-                // This corresponds to: index('type').sortKeys(['sk']).name('policy').queryField("policyList")
-                const { data: policies } = await client.models.InsuranceData.policyList({
+                // A. Fetch Policies using the GSI 'policyList' (type = 'POLICY')
+                // This grabs the 10 records you just created
+                const { data: policies, errors: policyErrors } = await client.models.InsuranceData.policyList({
                     type: 'POLICY'
                 });
 
-                // 2. Get all Claims using the 'ativePolicy' index logic (filtered manually or via similar query)
-                // Since we don't have a 'claimList' queryField explicitly, we can reuse policyList if type is indexed, 
-                // OR query 'ativePolicy' if we want status filtering. 
-                // Let's assume we query by type='CLAIM' if the index allows, or filter client side.
-                // Based on your schema: index('type').sortKeys(['sk']).name('policy')
+                if (policyErrors) throw new Error("Failed to fetch policies");
+
+                // B. Fetch Claims (Assuming type='CLAIM' exists, or empty for now)
+                // We use the same index but filter for claims
                 const { data: claims } = await client.models.InsuranceData.policyList({
                     type: 'CLAIM'
                 });
 
-                setStats({ policies, claims, loading: false });
+                setStats({ policies, claims: claims || [], loading: false, error: null });
             } catch (error) {
-                console.error("Error fetching dashboard data:", error);
-                setStats(s => ({ ...s, loading: false }));
+                console.error("Dashboard Error:", error);
+                setStats(s => ({ ...s, loading: false, error: error.message }));
             }
         };
 
         fetchDashboardData();
     }, []);
 
+    // --- 2. KPI CALCULATIONS ---
     const kpis = useMemo(() => {
-        if (stats.loading) return null;
+        if (stats.loading || !stats.policies.length) return null;
         
         const totalPremium = stats.policies.reduce((acc, p) => acc + (p.premiumAmount || 0), 0);
-        const activeClaims = stats.claims.filter(c => c.status !== 'CLOSED' && c.status !== 'REJECTED').length;
+        const policyCount = stats.policies.length;
         
+        // Calculate average premium
+        const avgPremium = policyCount ? totalPremium / policyCount : 0;
+
+        // Find most common status
+        const statusCounts = stats.policies.reduce((acc, p) => {
+            acc[p.status] = (acc[p.status] || 0) + 1;
+            return acc;
+        }, {});
+        const topStatus = Object.keys(statusCounts).reduce((a, b) => statusCounts[a] > statusCounts[b] ? a : b, 'N/A');
+
         return {
-            totalPolicies: stats.policies.length,
+            totalPolicies: policyCount,
             totalPremium,
-            activeClaims,
-            avgPremium: stats.policies.length ? (totalPremium / stats.policies.length) : 0
+            avgPremium,
+            topStatus
         };
     }, [stats]);
 
-    const chartData = useMemo(() => {
+    // --- 3. CHART DATA PREPARATION ---
+    const statusChartData = useMemo(() => {
         if (!stats.policies.length) return [];
-        const statusCounts = stats.policies.reduce((acc, curr) => {
+        
+        const counts = stats.policies.reduce((acc, curr) => {
             const s = curr.status || 'UNKNOWN';
             acc[s] = (acc[s] || 0) + 1;
             return acc;
         }, {});
-        return Object.keys(statusCounts).map(k => ({ name: k, value: statusCounts[k] }));
+
+        return Object.keys(counts).map(key => ({ 
+            name: key, 
+            value: counts[key] 
+        }));
     }, [stats.policies]);
 
-    const COLORS = ['#0ea5e9', '#22c55e', '#eab308', '#ef4444', '#64748b'];
+    // Colors for the Pie Chart slices
+    const STATUS_COLORS = {
+        'ACTIVE': '#22c55e',   // Green
+        'PENDING': '#eab308',  // Yellow
+        'CANCELLED': '#64748b',// Gray
+        'REJECTED': '#ef4444', // Red
+        'APPROVED': '#3b82f6', // Blue
+        'EXPIRED': '#f97316'   // Orange
+    };
 
-    if (stats.loading) return <div className="p-8 text-center text-slate-500 animate-pulse">Loading Intelligence...</div>;
+    // Fallback loading state
+    if (stats.loading) return (
+        <div className="flex h-full items-center justify-center p-8">
+            <div className="text-slate-500 animate-pulse flex flex-col items-center gap-2">
+                <div className="w-8 h-8 border-4 border-slate-600 border-t-emerald-500 rounded-full animate-spin"></div>
+                <span className="text-sm font-bold">Loading Intelligence...</span>
+            </div>
+        </div>
+    );
 
     return (
-        <div className="p-4 space-y-6">
-            <header className="flex justify-between items-end">
+        <div className="p-6 space-y-6 bg-slate-900 min-h-screen text-slate-200">
+            
+            {/* --- HEADER --- */}
+            <header className="flex justify-between items-end border-b border-slate-800 pb-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-white">AssurEnligne</h1>
-                    <p className="text-slate-400 text-sm">Welcome back, Admin</p>
+                    <h1 className="text-2xl font-black text-white tracking-tight">AssurEnligne</h1>
+                    <p className="text-slate-400 text-sm font-medium">Underwriting Dashboard</p>
                 </div>
-                <span className="text-xs bg-sky-900/50 text-sky-400 px-3 py-1 rounded-full border border-sky-800">
-                    Live Data
-                </span>
+                <div className="flex items-center gap-2">
+                    <span className="relative flex h-3 w-3">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                    </span>
+                    <span className="text-xs font-bold text-emerald-400">Live Data</span>
+                </div>
             </header>
 
-            {/* KPI GRID */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                <KPI_CARD title="Total Policies" value={kpis.totalPolicies} subtext="+12% from last month" />
-                <KPI_CARD title="Annual Premium" value={`$${kpis.totalPremium.toLocaleString()}`} color="text-emerald-400" />
-                <KPI_CARD title="Active Claims" value={kpis.activeClaims} color="text-amber-400" subtext="Requires attention" />
-                <KPI_CARD title="Avg. Premium" value={`$${kpis.avgPremium.toFixed(0)}`} subtext="Per policy" />
-            </div>
+            {/* --- KPI GRID --- */}
+            {kpis && (
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 animate-fade-in-up">
+                    <KPICard 
+                        title="Total Policies" 
+                        value={kpis.totalPolicies} 
+                        subtext="All time records" 
+                        color="text-white"
+                        borderColor="border-indigo-500/30"
+                    />
+                    <KPICard 
+                        title="Total Premium" 
+                        value={`$${kpis.totalPremium.toLocaleString()}`} 
+                        subtext="Gross Written Premium" 
+                        color="text-emerald-400"
+                        borderColor="border-emerald-500/30"
+                    />
+                    <KPICard 
+                        title="Avg. Premium" 
+                        value={`$${kpis.avgPremium.toFixed(0)}`} 
+                        subtext="Per policy average" 
+                        color="text-sky-400"
+                        borderColor="border-sky-500/30"
+                    />
+                    <KPICard 
+                        title="Dominant Status" 
+                        value={kpis.topStatus} 
+                        subtext="Most frequent status" 
+                        color="text-amber-400"
+                        borderColor="border-amber-500/30"
+                    />
+                </div>
+            )}
 
-            {/* CHARTS ROW */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="bg-slate-800 p-4 rounded-xl border border-slate-700">
-                    <h3 className="text-white font-semibold mb-4 text-sm">Policy Status Distribution</h3>
-                    <div className="h-64">
+            {/* --- MAIN CHARTS AREA --- */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                
+                {/* 1. STATUS DISTRIBUTION (PIE CHART) */}
+                <div className="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-xl">
+                    <h3 className="text-white font-bold mb-6 text-sm flex items-center gap-2">
+                        <span className="w-1 h-4 bg-indigo-500 rounded-full"></span>
+                        Policy Status Distribution
+                    </h3>
+                    <div className="h-72 w-full">
                         <ResponsiveContainer width="100%" height="100%">
                             <PieChart>
                                 <Pie 
-                                    data={chartData} 
-                                    innerRadius={60} 
-                                    outerRadius={80} 
+                                    data={statusChartData} 
+                                    cx="50%" 
+                                    cy="50%" 
+                                    innerRadius={80} 
+                                    outerRadius={100} 
                                     paddingAngle={5} 
                                     dataKey="value"
+                                    stroke="none"
                                 >
-                                    {chartData.map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                    {statusChartData.map((entry, index) => (
+                                        <Cell 
+                                            key={`cell-${index}`} 
+                                            fill={STATUS_COLORS[entry.name] || '#94a3b8'} 
+                                        />
                                     ))}
                                 </Pie>
                                 <Tooltip 
-                                    contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', color: '#fff', borderRadius: '8px' }}
+                                    contentStyle={{ 
+                                        backgroundColor: '#0f172a', 
+                                        borderColor: '#334155', 
+                                        color: '#fff', 
+                                        borderRadius: '8px',
+                                        fontSize: '12px'
+                                    }}
                                     itemStyle={{ color: '#fff' }}
+                                />
+                                <Legend 
+                                    verticalAlign="bottom" 
+                                    height={36}
+                                    iconType="circle"
+                                    formatter={(value) => <span className="text-slate-400 text-xs font-bold ml-1">{value}</span>}
                                 />
                             </PieChart>
                         </ResponsiveContainer>
                     </div>
                 </div>
 
-                <div className="bg-slate-800 p-4 rounded-xl border border-slate-700">
-                    <h3 className="text-white font-semibold mb-4 text-sm">Recent Claims</h3>
-                    <div className="space-y-3 overflow-y-auto max-h-64 pr-2">
-                        {stats.claims.slice(0, 5).map(claim => (
-                            <div key={claim.sk} className="flex justify-between items-center p-3 bg-slate-900/50 rounded-lg border border-slate-700/50">
-                                <div>
-                                    <p className="text-sm font-medium text-slate-200">{claim.claimDescription || 'No Description'}</p>
-                                    <p className="text-xs text-slate-500">{claim.incidentDate || 'N/A'}</p>
+                {/* 2. RECENT ACTIVITY LIST */}
+                <div className="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-xl flex flex-col">
+                    <h3 className="text-white font-bold mb-6 text-sm flex items-center gap-2">
+                        <span className="w-1 h-4 bg-emerald-500 rounded-full"></span>
+                        Recent Policies
+                    </h3>
+                    <div className="flex-1 overflow-y-auto max-h-72 pr-2 space-y-3 custom-scrollbar">
+                        {stats.policies.length === 0 ? (
+                            <div className="text-center text-slate-500 py-10">No policies found</div>
+                        ) : (
+                            stats.policies
+                                .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)) // Sort by newest
+                                .slice(0, 10)
+                                .map((policy) => (
+                                <div key={policy.sk} className="group flex justify-between items-center p-3 bg-slate-900/50 hover:bg-slate-700/50 transition-colors rounded-lg border border-slate-700/50">
+                                    <div className="flex flex-col">
+                                        <span className="text-xs font-bold text-white group-hover:text-indigo-400 transition-colors">
+                                            {policy.policyNumber || 'NO-NUMBER'}
+                                        </span>
+                                        <span className="text-[10px] text-slate-500 uppercase tracking-wider">
+                                            {policy.carManifYear} Model • {policy.pk.split('#')[1]}
+                                        </span>
+                                    </div>
+                                    <div className="text-right">
+                                        <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border ${
+                                            policy.status === 'ACTIVE' ? 'bg-green-500/10 text-green-400 border-green-500/20' :
+                                            policy.status === 'PENDING' ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20' :
+                                            policy.status === 'REJECTED' ? 'bg-red-500/10 text-red-400 border-red-500/20' :
+                                            'bg-slate-500/10 text-slate-400 border-slate-500/20'
+                                        }`}>
+                                            {policy.status}
+                                        </span>
+                                        <p className="text-xs font-bold text-slate-300 mt-1">
+                                            ${policy.premiumAmount}
+                                        </p>
+                                    </div>
                                 </div>
-                                <span className={`text-[10px] font-bold px-2 py-1 rounded border ${
-                                    claim.status === 'APPROVED' ? 'bg-green-900/30 text-green-400 border-green-800' :
-                                    claim.status === 'PENDING' ? 'bg-amber-900/30 text-amber-400 border-amber-800' :
-                                    'bg-slate-800 text-slate-400 border-slate-600'
-                                }`}>
-                                    {claim.status}
-                                </span>
-                            </div>
-                        ))}
-                        {stats.claims.length === 0 && <p className="text-center text-slate-600 text-sm py-4">No active claims found.</p>}
+                            ))
+                        )}
                     </div>
                 </div>
             </div>
