@@ -42,7 +42,10 @@ const schema = a.schema({
   })
     // 5. KEY CONFIGURATION
     .identifier(['pk', 'sk']) // <--- This forces the Composite Key
-    .authorization(allow => [allow.owner()])
+    .authorization(allow => [allow.owner(),
+allow.authenticated().to(['read'])
+
+      ])
     .secondaryIndexes((index) => [
       // GSI 1: Generic Overloaded Index
       // Pattern A: "Get all Claims by Status" -> gsi1pk="CLAIM#OPEN", gsi1sk="2024-01-01"

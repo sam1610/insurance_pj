@@ -1,30 +1,27 @@
+// PoliciesView.jsx
 import React, { useState, useEffect } from 'react';
 import { client } from "../DataHook/AmplifyClient";
-import { v4 as uuidv4 } from 'uuid'; 
 import CreatePolicyModal from './CreatePolicyModal';
 
-export default function PoliciesView({ username, isCustomerView = false, userId }) {
+export default function PoliciesView({ username, userId }) {
     const [policies, setPolicies] = useState([]);
     const [filter, setFilter] = useState('ALL');
     const [loading, setLoading] = useState(true);
-    
-    // Modal State
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    // Fetch Logic
     const fetchPolicies = async () => {
+        if (!userId) return;
         setLoading(true);
         try {
-            const { data } = await client.models.InsuranceData.list({
-                pk: `USER#${userId}`,
-                sk: { beginsWith: 'POL#' }
+            // Fetch policies owned by this user
+            const { data } = await client.models.InsuranceData.userList({
+                type: 'POLICY',
+                pk: { eq: `USER#${userId}` }
             });
             
             let filtered = data;
-            if (filter !== 'ALL') {
-                filtered = data.filter(p => p.status === filter);
-            }
+            if (filter !== 'ALL') filtered = data.filter(p => p.status === filter);
             setPolicies(filtered);
         } catch (err) {
             console.error("Error fetching policies:", err);
@@ -34,49 +31,47 @@ export default function PoliciesView({ username, isCustomerView = false, userId 
     };
 
     useEffect(() => {
-        if (userId) fetchPolicies();
+        fetchPolicies();
     }, [filter, userId]);
 
-    // Handle Policy Creation (Updated for Auto Schema)
     const handleCreatePolicy = async (formData) => {
         setIsSubmitting(true);
         try {
-            const newPolicyId = `POL#${uuidv4().split('-')[0].toUpperCase()}`; 
-            
+            // Native ID generation
+            const uniqueId = typeof crypto !== 'undefined' && crypto.randomUUID 
+                ? crypto.randomUUID().split('-')[0].toUpperCase()
+                : Math.random().toString(36).substring(2, 9).toUpperCase();
+
             await client.models.InsuranceData.create({
-                // 1. KEYS
                 pk: `USER#${userId}`,
-                sk: newPolicyId,
+                sk: `POL#${uniqueId}`,
                 type: 'POLICY',
-                
-                // 2. POLICY ATTRIBUTES (Schema-Specific)
                 policyNumber: `AUTO-${Date.now().toString().slice(-6)}`,
                 premiumAmount: parseFloat(formData.premiumAmount),
                 startDate: formData.startDate,
                 endDate: formData.endDate,
                 carManifYear: parseInt(formData.carManifYear),
                 carAge: parseInt(formData.carAge),
-                
-                // 3. STATUS
                 status: 'PENDING',
                 createdAt: new Date().toISOString()
             });
 
             setIsModalOpen(false);
             fetchPolicies();
-
         } catch (err) {
             console.error("Error creating policy:", err);
-            alert("Failed to submit policy request.");
+            alert("Failed to submit policy.");
         } finally {
             setIsSubmitting(false);
         }
     };
 
+    // ... (Keep your existing Return JSX: Header, Filter Buttons, List Grid, Modal) ...
+    // ... (The return logic you posted was correct, just ensure it uses these updated handlers) ...
     return (
         <div className="p-4 max-w-7xl mx-auto">
-            {/* Header */}
-            <div className="flex flex-col md:flex-row justify-between items-end md:items-center mb-8 gap-4">
+             {/* Header */}
+             <div className="flex flex-col md:flex-row justify-between items-end md:items-center mb-8 gap-4">
                 <div>
                     <h1 className="text-3xl font-bold text-indigo-400">My Vehicles</h1>
                     <p className="text-slate-400 mt-1">Manage your auto insurance policies</p>
@@ -103,7 +98,6 @@ export default function PoliciesView({ username, isCustomerView = false, userId 
                         onClick={() => setIsModalOpen(true)}
                         className="bg-indigo-500 hover:bg-indigo-400 text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 shadow-lg shadow-indigo-900/20 transition-all"
                     >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
                         Insure Vehicle
                     </button>
                 </div>
@@ -116,17 +110,12 @@ export default function PoliciesView({ username, isCustomerView = false, userId 
                 </div>
             ) : policies.length === 0 ? (
                  <div className="text-center py-16 bg-slate-800/30 rounded-xl border border-dashed border-slate-700">
-                    <p className="text-slate-400 mb-2">No active auto policies.</p>
+                    <p className="text-slate-400 mb-2">No active policies found.</p>
                 </div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {policies.map(policy => (
                         <div key={policy.sk} className="bg-slate-800 rounded-xl p-6 border border-slate-700 hover:border-indigo-500/50 transition-all group relative overflow-hidden">
-                            {/* Car Icon */}
-                            <div className="absolute -right-4 -top-4 opacity-5 group-hover:opacity-10 transition-opacity">
-                                <svg className="w-32 h-32 text-indigo-500" fill="currentColor" viewBox="0 0 24 24"><path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5 13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM5 11l1.5-4.5h11L19 11H5z"/></svg>
-                            </div>
-
                             <div className="relative z-10">
                                 <div className="flex justify-between items-start mb-4">
                                     <span className={`px-2 py-1 text-[10px] font-bold rounded uppercase tracking-wider ${
@@ -138,11 +127,8 @@ export default function PoliciesView({ username, isCustomerView = false, userId 
                                     </span>
                                     <p className="text-slate-500 text-xs font-mono">#{policy.policyNumber}</p>
                                 </div>
-
-                                {/* Main Car Info */}
                                 <h3 className="text-white font-bold text-lg mb-1">{policy.carManifYear} Model</h3>
                                 <p className="text-slate-400 text-xs mb-6">Vehicle Age: {policy.carAge} years</p>
-
                                 <div className="grid grid-cols-2 gap-4 border-t border-slate-700/50 pt-4">
                                     <div>
                                         <p className="text-slate-500 text-[10px] uppercase font-bold">Expires</p>

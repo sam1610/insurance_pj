@@ -97,9 +97,11 @@ export const handler: AppSyncResolverHandler<PredictPremiumArgs, PremiumQuote> =
   } catch (e) {
     console.error("🔥 CRITICAL BEDROCK ERROR 🔥");
     console.error(e);
-    // TEMPORARY: Throw error so frontend sees it, instead of silent fallback
-    // This allows you to read the error message in the React 'alert'
-    throw new Error(`Bedrock Failed: ${e.message}`);
+    
+    // --- THE FIX IS HERE ---
+    // We cast 'e' to 'Error' to satisfy TypeScript strictness
+    const errorMessage = (e as Error).message;
+    throw new Error(`Bedrock Failed: ${errorMessage}`);
   }
 
   const finalPremium = annualPremium * durationMultiplier;
