@@ -1,5 +1,15 @@
 {
   "compilerOptions": {
-    "moduleResolution": "node"
-  }
+    "target": "es2020",
+    "module": "esnext",
+    "jsx": "react",
+    "checkJs": false
+  },
+  "exclude": [
+    "node_modules",
+    ".amplify", 
+    ".aws-amplify",
+    "dist",
+    "build"
+  ]
 }
